@@ -10,6 +10,7 @@
 #include <errno.h>
 
 #define MAXDATASIZE 2048
+#define PORT 14182
 
 
 int main( int argc, char *argv[])
@@ -19,8 +20,12 @@ int main( int argc, char *argv[])
   struct sockaddr_in serverAddr;
   struct sockaddr_in clientAddr;
   char buf[MAXDATASIZE] = {0};
-  //char msgBuf[MAXDATASIZE] = {0};
+  char clientName[MAXDATASIZE] = {0};
   time_t timer;
+  int port=PORT;
+
+  if(argc > 1)
+    port=atoi(argv[1]);
 
   if((sockFd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
   {
@@ -35,7 +40,7 @@ int main( int argc, char *argv[])
   }
 
   serverAddr.sin_family = AF_INET;
-  serverAddr.sin_port = htons(14182);;
+  serverAddr.sin_port = htons(port);;
   serverAddr.sin_addr.s_addr = INADDR_ANY;
   memset(&(serverAddr.sin_zero), 0, 8);
 
@@ -52,8 +57,7 @@ int main( int argc, char *argv[])
     exit(-1);
   }
 
-  int i=1;
-  while(i--)
+  while(port)
   {
     sinSize = sizeof(struct sockaddr);
     if((connFd = accept(sockFd, (struct sockaddr*)&clientAddr, &sinSize)) < 0)
@@ -62,12 +66,9 @@ int main( int argc, char *argv[])
       exit(-1);
     }
 
-    timer = time(NULL); 
-    printf("Connection established with %s at %s", inet_ntoa(clientAddr.sin_addr), ctime(&timer));
+    sprintf(buf, "[Server] : May I know who are you ? Name would be fine.\n");
 
-    sprintf(buf, "Connection is successfully established with Server. Please use enter to send the message.\n");
-
-    if ((numReadBytes=send(connFd, buf, strlen(buf), 0)) < 0)
+    if ((send(connFd, buf, strlen(buf), 0)) < 0)
     {
       perror("send");
       exit(-1);
@@ -75,37 +76,84 @@ int main( int argc, char *argv[])
 
     buf[0] = '\0';
 
-    int j=1;
-    while(j)
+    if((numReadBytes = recv(connFd, buf, MAXDATASIZE-1, 0)) < 0)
     {
-      if((numReadBytes = recv(connFd, buf, MAXDATASIZE-1, 0)) < 0)
-      {
-        perror("recv");
-        exit(-1);
-      }
+      perror("recv");
+      exit(-1);
+    }
 
-      buf[numReadBytes]='\0';
+    buf[numReadBytes-1]='\0';
 
-      if(strcmp("CLOSE_CON",buf) == 0)
+    strcpy(clientName,buf);
+
+    buf[0] = '\0';
+
+    timer = time(NULL); 
+    printf("INFO->Connection established with %s from IP %s at %s", clientName, inet_ntoa(clientAddr.sin_addr), ctime(&timer));
+
+    sprintf(buf, "INFO->Connection is successfully established with Server. Please use enter to send the message.\n");
+
+    if ((send(connFd, buf, strlen(buf), 0)) < 0)
+    {
+      perror("send");
+      exit(-1);
+    }
+
+    buf[0] = '\0';
+
+    int pid = fork();
+
+    if(pid == 0)
+    {
+      close(sockFd); 
+      while(port)
       {
-        printf("Recieved CLOSE_CON from client %s. Hence closing connection.\n", inet_ntoa(clientAddr.sin_addr));
-        break;
-      }
-      else
-      {
-        printf("[%s] : %s", inet_ntoa(clientAddr.sin_addr), buf);
+        if((numReadBytes = recv(connFd, buf, MAXDATASIZE-1, 0)) < 0)
+        {
+          perror("recv");
+          exit(-1);
+        }
+     
+        buf[numReadBytes]='\0';
+     
+        if(strcmp("CLOSE_CON\n",buf) == 0)
+        {
+          buf[0] = '\0';
+          printf("INFO->Recieved CLOSE_CON from client %s. Hence closing connection.\n", clientName);
+          sprintf(buf,"[Server] : Recieved CLOSE_CON from your side so closing connection. Bye!!\n");
+          if ((send(connFd, buf, strlen(buf), 0)) < 0)
+          {
+            perror("send");
+            exit(-1);
+          }
+          break;
+        }
+        else
+        {
+          printf("[%s] : %s", clientName, buf);
+          buf[0]='\0';
+        }
+       
+        sprintf(buf,"[Server] : Length of message recieved from your side is: %d\n", numReadBytes-1);
+        if ((send(connFd, buf, strlen(buf), 0)) < 0)
+        {
+          perror("send");
+          exit(-1);
+        }
         buf[0]='\0';
       }
-     
-      sprintf(buf,"[Server] : Length of message recieved from your side is: %d\n", numReadBytes-1);
-      if ((numReadBytes=send(connFd, buf, strlen(buf), 0)) < 0)
-      {
-        perror("send");
-        exit(-1);
-      }
-      buf[0]='\0';
+      close(connFd);
+      return 0;
     }
-    close(connFd);
+    else if(pid > 0)
+    {
+      //Parent will do nothing!!
+    }
+    else
+    {
+      perror("fork");
+      exit(-1);
+    }
   }
   close(sockFd);
   return 0;
