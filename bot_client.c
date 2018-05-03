@@ -75,5 +75,6 @@ int main(int argc, char *argv[])
 
     msg_buf[0]='\0';
   }
-  close(sockFd);
+  shutdown(sockFd,SHUT_RD);
+  sleep(10);
 }
