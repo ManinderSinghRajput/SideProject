@@ -1,8 +1,7 @@
 #
 #
 #
-#Child are going in defunct state after getting returned from main if parent is still running. Use threads instead.
-#
-#
+#Make threads and threads details dynamic. Increase with no of connections.
+#Reuse of threads which have completed their task
 #
 
