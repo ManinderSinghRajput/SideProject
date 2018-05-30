@@ -121,6 +121,8 @@ void get_char_and_manage_cache(queue *q, char *x)
     break;
     case '(' : add_in_cache(q, '(', '9'); *x = '9';
     break;
+    case ')' : add_in_cache(q, ')', '0'); *x = '0';
+    break;
   }
 }
 
